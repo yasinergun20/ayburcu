@@ -1,5 +1,4 @@
 fastapi
 uvicorn
-swisseph
+flatlib
 pytz
-timezonefinder
