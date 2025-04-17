@@ -1,12 +1,12 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-import swisseph as swe
+from timezonefinder import TimezoneFinder
 from datetime import datetime
+import pytz
+import swisseph as swe
 
 app = FastAPI()
-
-# Gerekirse ephemeris yolu
-swe.set_ephe_path('.')
+swe.set_ephe_path('.')  # Gerekirse yol ver
 
 ZODIAC = [
     'Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
@@ -14,11 +14,10 @@ ZODIAC = [
 ]
 
 class AyBurcuIstek(BaseModel):
-    tarih: str      # "1995-04-15"
-    saat: str       # "10:45"
-    utc: str        # "+02:00"
-    lat: float      # 39.92
-    lon: float      # 32.85
+    tarih: str  # "2000-01-01"
+    saat: str   # "12:00"
+    lat: float  # 39.92
+    lon: float  # 32.85
 
 def get_zodiac(degree):
     index = int(degree / 30) % 12
@@ -27,22 +26,27 @@ def get_zodiac(degree):
 @app.post("/ayburcu")
 def hesapla(data: AyBurcuIstek):
     try:
-        # Tarihi UTC ile birlikte parse et
-        dt = datetime.strptime(f"{data.tarih} {data.saat}", "%Y-%m-%d %H:%M")
-        utc_offset = int(data.utc.replace("+", "").replace(":", ""))
-        hour_decimal = dt.hour + dt.minute / 60.0
-        julday = swe.julday(dt.year, dt.month, dt.day, hour_decimal)
+        # 🕒 Yerel saat → UTC
+        tf = TimezoneFinder()
+        tz_name = tf.timezone_at(lat=data.lat, lng=data.lon)
+        tz = pytz.timezone(tz_name)
+        
+        local_dt = datetime.strptime(f"{data.tarih} {data.saat}", "%Y-%m-%d %H:%M")
+        localized = tz.localize(local_dt)
+        utc_dt = localized.astimezone(pytz.utc)
 
-        # 🌕 Ay derecesi (boylam)
-        moon = swe.calc_ut(julday, swe.MOON)[0]  # [longitude, latitude, distance]
+        # 🌍 UTC zamanı → Julian Day
+        utc_hour = utc_dt.hour + utc_dt.minute / 60.0
+        jd = swe.julday(utc_dt.year, utc_dt.month, utc_dt.day, utc_hour)
+
+        # 🌕 Ay'ın konumu
+        moon = swe.calc_ut(jd, swe.MOON)[0]
         moon_lon = moon[0]
-
         burc = get_zodiac(moon_lon)
         derece = round(moon_lon % 30, 2)
 
-        # 🏠 Ev hesabı (Placidus)
-        cusps, _ = swe.houses(julday, data.lat, data.lon, b'P')
-
+        # 🏠 Ev konumu
+        cusps, _ = swe.houses(jd, data.lat, data.lon, b'P')
         ev = 12
         for i in range(12):
             c1 = cusps[i]
@@ -63,3 +67,4 @@ def hesapla(data: AyBurcuIstek):
         }
 
     except Exception as e:
+        return {"hata": str(e)}
