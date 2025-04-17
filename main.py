@@ -4,9 +4,7 @@ import swisseph as swe
 from datetime import datetime
 
 app = FastAPI()
-
-# Gerekirse ephemeris yolu
-swe.set_ephe_path('.')
+swe.set_ephe_path('.')  # Ephemeris path
 
 ZODIAC = [
     'Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
@@ -14,11 +12,11 @@ ZODIAC = [
 ]
 
 class AyBurcuIstek(BaseModel):
-    tarih: str      # "1995-04-15"
-    saat: str       # "10:45"
-    utc: str        # "+02:00"
-    lat: float      # 39.92
-    lon: float      # 32.85
+    tarih: str
+    saat: str
+    utc: str
+    lat: float
+    lon: float
 
 def get_zodiac(degree):
     index = int(degree / 30) % 12
@@ -27,22 +25,22 @@ def get_zodiac(degree):
 @app.post("/ayburcu")
 def hesapla(data: AyBurcuIstek):
     try:
-        # Tarihi UTC ile birlikte parse et
         dt = datetime.strptime(f"{data.tarih} {data.saat}", "%Y-%m-%d %H:%M")
-        utc_offset = int(data.utc.replace("+", "").replace(":", ""))
-        hour_decimal = dt.hour + dt.minute / 60.0
+
+        # ✅ UTC farkını saat cinsine çevir
+        utc_saat = int(data.utc.replace(":", "").replace("+", ""))
+        hour_decimal = dt.hour + dt.minute / 60.0 - utc_saat
+
         julday = swe.julday(dt.year, dt.month, dt.day, hour_decimal)
 
-        # 🌕 Ay derecesi (boylam)
-        moon = swe.calc_ut(julday, swe.MOON)[0]  # [longitude, latitude, distance]
+        # 🌕 Ay konumu
+        moon = swe.calc_ut(julday, swe.MOON)[0]
         moon_lon = moon[0]
-
         burc = get_zodiac(moon_lon)
         derece = round(moon_lon % 30, 2)
 
-        # 🏠 Ev hesabı (Placidus)
+        # 🏠 Ev hesabı
         cusps, _ = swe.houses(julday, data.lat, data.lon, b'P')
-
         ev = 12
         for i in range(12):
             c1 = cusps[i]
