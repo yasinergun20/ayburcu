@@ -17,13 +17,13 @@ class AyBurcuIstek(BaseModel):
 @app.post("/ayburcu")
 def hesapla(data: AyBurcuIstek):
     try:
-        print("Gelen veri:")
-        print(f"Tarih: {data.tarih}, Saat: {data.saat}, UTC: {data.utc}")
-        print(f"Lat: {data.lat}, Lon: {data.lon}")
+        # 🔥 Tarihi manuel parçala
+        yil, ay, gun = data.tarih.split("-")
+        saat = data.saat
+        utc = data.utc
 
-        dt = Datetime(data.tarih, data.saat, data.utc)
-        print(f"Datetime objesi: {dt}")
-        
+        dt = Datetime(f"{yil}-{ay}-{gun}", saat, utc)
+
         pos = GeoPos(str(data.lat), str(data.lon))
         chart = Chart(dt, pos)
         moon = chart.get(const.MOON)
@@ -35,5 +35,4 @@ def hesapla(data: AyBurcuIstek):
         }
 
     except Exception as e:
-        print(f"HATA: {e}")
         return {"hata": str(e)}
