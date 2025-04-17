@@ -17,20 +17,14 @@ class AyBurcuIstek(BaseModel):
 @app.post("/ayburcu")
 def hesapla(data: AyBurcuIstek):
     try:
-        # 🔁 Tarih formatını düzelt: '-' yerine '/' kullanılmalı
-        tarih_parcali = data.tarih.replace("-", "/")
+        # 🔁 Tarih formatı düzelt
+        tarih_str = data.tarih.replace("-", "/")  # flatlib yyyy/mm/dd istiyor
 
-        # 🔁 Koordinatlar string olmalı, düz float değil
-        lat = "{:.6f}".format(data.lat)
-        lon = "{:.6f}".format(data.lon)
+        # ✅ Flatlib Datetime ve GeoPos kullan
+        dt = Datetime(tarih_str, data.saat, data.utc)
+        pos = GeoPos(str(float(data.lat)), str(float(data.lon)))  # float → str
 
-        # ✅ Flatlib uyumlu datetime objesi
-        dt = Datetime(tarih_parcali, data.saat, data.utc)
-
-        # ✅ GeoPos oluştur
-        pos = GeoPos(lat, lon)
-
-        # ✅ Harita oluştur ve Ay bilgilerini al
+        # ✅ Chart oluştur ve Ay'ı al
         chart = Chart(dt, pos)
         moon = chart.get(const.MOON)
 
