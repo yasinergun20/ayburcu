@@ -1,58 +1,64 @@
-from datetime import datetime
+from fastapi import FastAPI
+from pydantic import BaseModel
 import swisseph as swe
-from timezonefinder import TimezoneFinder
-import pytz
+from datetime import datetime
 
-swe.set_ephe_path('.')
+app = FastAPI()
+swe.set_ephe_path('.')  # Ephemeris path
 
-# VERİLER
-tarih = "2000-01-01"
-saat = "12:00"
-lat = 39.92
-lon = 32.85
-
-# ZAMAN HESABI
-tf = TimezoneFinder()
-tz_name = tf.timezone_at(lat=lat, lng=lon)
-tz = pytz.timezone(tz_name)
-
-dt = datetime.strptime(f"{tarih} {saat}", "%Y-%m-%d %H:%M")
-local_dt = tz.localize(dt)
-utc_dt = local_dt.astimezone(pytz.utc)
-
-print("🌐 Timezone:", tz_name)
-print("🕒 Yerel:", local_dt)
-print("🕒 UTC:", utc_dt)
-
-# JULDAY
-utc_hour = utc_dt.hour + utc_dt.minute / 60.0
-jd = swe.julday(utc_dt.year, utc_dt.month, utc_dt.day, utc_hour)
-
-# AY BURCU
-moon = swe.calc_ut(jd, swe.MOON)[0]
-moon_lon = moon[0]
-zodiacs = [
+ZODIAC = [
     'Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
     'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'
 ]
-burc = zodiacs[int(moon_lon // 30)]
-derece = round(moon_lon % 30, 2)
 
-# EV
-cusps, _ = swe.houses(jd, lat, lon, b'P')
-ev = 12
-for i in range(12):
-    c1 = cusps[i]
-    c2 = cusps[(i + 1) % 12]
-    if c1 < c2:
-        if c1 <= moon_lon < c2:
-            ev = i + 1
-            break
-    else:
-        if moon_lon >= c1 or moon_lon < c2:
-            ev = i + 1
-            break
+class AyBurcuIstek(BaseModel):
+    tarih: str
+    saat: str
+    utc: str
+    lat: float
+    lon: float
 
-print("🌕 Ay Burcu:", burc)
-print("📐 Derece:", derece)
-print("🏠 Ev:", ev)
+def get_zodiac(degree):
+    index = int(degree / 30) % 12
+    return ZODIAC[index]
+
+@app.post("/ayburcu")
+def hesapla(data: AyBurcuIstek):
+    try:
+        dt = datetime.strptime(f"{data.tarih} {data.saat}", "%Y-%m-%d %H:%M")
+
+        # ✅ UTC farkını saat cinsine çevir
+        utc_saat = int(data.utc.replace(":", "").replace("+", ""))
+        hour_decimal = dt.hour + dt.minute / 60.0 - utc_saat
+
+        julday = swe.julday(dt.year, dt.month, dt.day, hour_decimal)
+
+        # 🌕 Ay konumu
+        moon = swe.calc_ut(julday, swe.MOON)[0]
+        moon_lon = moon[0]
+        burc = get_zodiac(moon_lon)
+        derece = round(moon_lon % 30, 2)
+
+        # 🏠 Ev hesabı
+        cusps, _ = swe.houses(julday, data.lat, data.lon, b'P')
+        ev = 12
+        for i in range(12):
+            c1 = cusps[i]
+            c2 = cusps[(i + 1) % 12]
+            if c1 < c2:
+                if c1 <= moon_lon < c2:
+                    ev = i + 1
+                    break
+            else:
+                if moon_lon >= c1 or moon_lon < c2:
+                    ev = i + 1
+                    break
+
+        return {
+            "burc": burc,
+            "derece": derece,
+            "ev": ev
+        }
+
+    except Exception as e:
+        return {"hata": str(e)}
