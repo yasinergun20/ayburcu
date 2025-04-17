@@ -18,18 +18,14 @@ class AyBurcuIstek(BaseModel):
 @app.post("/ayburcu")
 def hesapla(data: AyBurcuIstek):
     try:
-        # Tarihi düzelt
         tarih = data.tarih.replace("-", "/")
         dt = Datetime(tarih, data.saat, data.utc)
         pos = GeoPos(data.lat, data.lon)
 
-        # Chart oluştur
-        chart = Chart(dt, pos, hsys='PLACIDUS')
+        # ❌ hsys='PLACIDUS' kullanılmıyor!
+        chart = Chart(dt, pos)
 
-        # Ay bilgisi
         moon = chart.get(const.MOON)
-
-        # Ay'ın evi (manuel hesaplama)
         moon_house = houses.getHouse(chart, moon)
 
         return {
