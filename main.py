@@ -4,6 +4,7 @@ from flatlib.chart import Chart
 from flatlib.datetime import Datetime
 from flatlib.geopos import GeoPos
 from flatlib import const
+import datetime
 
 app = FastAPI()
 
@@ -17,11 +18,13 @@ class AyBurcuIstek(BaseModel):
 @app.post("/ayburcu")
 def hesapla(data: AyBurcuIstek):
     try:
-        # 🔥 FLATLIB 'YYYY/MM/DD' FORMATINI BEKLİYOR
-        yil, ay, gun = data.tarih.split("-")
-        tarih_duzgun = f"{yil}/{ay}/{gun}"
+        # Python datetime objesi üret
+        tarih_saat_str = f"{data.tarih} {data.saat}"
+        dt_py = datetime.datetime.strptime(tarih_saat_str, "%Y-%m-%d %H:%M")
 
-        dt = Datetime(tarih_duzgun, data.saat, data.utc)
+        # Flatlib'e uygun datetime oluştur
+        dt = Datetime.fromDatetime(dt_py, utcoffset=data.utc)
+
         pos = GeoPos(str(data.lat), str(data.lon))
         chart = Chart(dt, pos)
         moon = chart.get(const.MOON)
