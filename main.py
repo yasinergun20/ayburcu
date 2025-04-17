@@ -2,9 +2,13 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 import swisseph as swe
 from datetime import datetime
+from timezonefinder import TimezoneFinder
+import pytz
 
 app = FastAPI()
-swe.set_ephe_path('.')  # Ephemeris path
+
+# Swiss Ephemeris path
+swe.set_ephe_path('.')
 
 ZODIAC = [
     'Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
@@ -12,11 +16,11 @@ ZODIAC = [
 ]
 
 class AyBurcuIstek(BaseModel):
-    tarih: str
-    saat: str
-    utc: str
-    lat: float
-    lon: float
+    tarih: str      # "1995-04-15"
+    saat: str       # "10:45"
+    lat: float      # 39.92
+    lon: float      # 32.85
+
 
 def get_zodiac(degree):
     index = int(degree / 30) % 12
@@ -25,21 +29,30 @@ def get_zodiac(degree):
 @app.post("/ayburcu")
 def hesapla(data: AyBurcuIstek):
     try:
+        # 1. Tarih-saat birleşimi
         dt = datetime.strptime(f"{data.tarih} {data.saat}", "%Y-%m-%d %H:%M")
 
-        # ✅ UTC farkını saat cinsine çevir
-        utc_saat = int(data.utc.replace(":", "").replace("+", ""))
-        hour_decimal = dt.hour + dt.minute / 60.0 - utc_saat
+        # 2. Timezone belirle
+        tf = TimezoneFinder()
+        timezone_name = tf.timezone_at(lat=data.lat, lng=data.lon)
+        if not timezone_name:
+            return {"hata": "Timezone bulunamadı."}
 
-        julday = swe.julday(dt.year, dt.month, dt.day, hour_decimal)
+        tz = pytz.timezone(timezone_name)
+        localized_dt = tz.localize(dt)
+        utc_dt = localized_dt.astimezone(pytz.utc)
 
-        # 🌕 Ay konumu
+        # 3. Julian Day hesapla (UTC olarak)
+        hour_decimal = utc_dt.hour + utc_dt.minute / 60.0
+        julday = swe.julday(utc_dt.year, utc_dt.month, utc_dt.day, hour_decimal)
+
+        # 4. Ay burcu
         moon = swe.calc_ut(julday, swe.MOON)[0]
         moon_lon = moon[0]
         burc = get_zodiac(moon_lon)
         derece = round(moon_lon % 30, 2)
 
-        # 🏠 Ev hesabı
+        # 5. Ev hesabı
         cusps, _ = swe.houses(julday, data.lat, data.lon, b'P')
         ev = 12
         for i in range(12):
@@ -57,7 +70,8 @@ def hesapla(data: AyBurcuIstek):
         return {
             "burc": burc,
             "derece": derece,
-            "ev": ev
+            "ev": ev,
+            "zamanDilimi": timezone_name
         }
 
     except Exception as e:
