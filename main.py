@@ -25,7 +25,8 @@ def hesapla(data: AyBurcuIstek):
         # Flatlib'e uygun datetime oluştur
         dt = Datetime.fromDatetime(dt_py, utcoffset=data.utc)
 
-        pos = GeoPos(str(data.lat), str(data.lon))
+       pos = GeoPos(f"{data.lat:.2f}", f"{data.lon:.2f}")
+
         chart = Chart(dt, pos)
         moon = chart.get(const.MOON)
 
