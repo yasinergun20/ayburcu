@@ -8,26 +8,25 @@ from flatlib import const
 app = FastAPI()
 
 class AyBurcuIstek(BaseModel):
-    tarih: str  # "1995-04-15"
-    saat: str   # "10:45"
-    utc: str    # "+03:00"
-    lat: float  # 39.92
-    lon: float  # 32.85
+    tarih: str     # "1995-04-15"
+    saat: str      # "10:45"
+    utc: str       # "+03:00"
+    lat: float     # 39.92
+    lon: float     # 32.85
 
 @app.post("/ayburcu")
 def hesapla(data: AyBurcuIstek):
     try:
-        # Flatlib için tarih formatını düzelt
-        tarih = data.tarih.replace("-", "/")  # Flatlib 'yyyy/mm/dd' ister
+        # 🔁 Tarih formatı Flatlib'e uygun hale getir (yyyy/mm/dd)
+        tarih_str = data.tarih.replace("-", "/")
 
-        # Koordinatları string'e çevir
-        lat_str = "{:.6f}".format(data.lat)  # örn: "39.920000"
-        lon_str = "{:.6f}".format(data.lon)
+        # 🔁 Flatlib datetime
+        dt = Datetime(tarih_str, data.saat, data.utc)
 
-        # Flatlib nesneleri
-        dt = Datetime(tarih, data.saat, data.utc)
-        pos = GeoPos(lat_str, lon_str)
+        # 🔁 GeoPos doğrudan float almalı!
+        pos = GeoPos(data.lat, data.lon)
 
+        # 🔁 Ay burcunu hesapla
         chart = Chart(dt, pos)
         moon = chart.get(const.MOON)
 
