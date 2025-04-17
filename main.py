@@ -16,7 +16,7 @@ ZODIAC = [
 class AyBurcuIstek(BaseModel):
     tarih: str      # "1995-04-15"
     saat: str       # "10:45"
-    utc: str        # "+03:00"
+    utc: str        # "+02:00"
     lat: float      # 39.92
     lon: float      # 32.85
 
