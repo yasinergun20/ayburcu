@@ -17,13 +17,11 @@ class AyBurcuIstek(BaseModel):
 @app.post("/ayburcu")
 def hesapla(data: AyBurcuIstek):
     try:
-        # 🔥 Tarihi manuel parçala
+        # 🔥 FLATLIB 'YYYY/MM/DD' FORMATINI BEKLİYOR
         yil, ay, gun = data.tarih.split("-")
-        saat = data.saat
-        utc = data.utc
+        tarih_duzgun = f"{yil}/{ay}/{gun}"
 
-        dt = Datetime(f"{yil}-{ay}-{gun}", saat, utc)
-
+        dt = Datetime(tarih_duzgun, data.saat, data.utc)
         pos = GeoPos(str(data.lat), str(data.lon))
         chart = Chart(dt, pos)
         moon = chart.get(const.MOON)
