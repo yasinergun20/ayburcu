@@ -18,7 +18,8 @@ class AyBurcuIstek(BaseModel):
 def hesapla(data: AyBurcuIstek):
     try:
         # Doğum zamanı tek string olarak veriliyor
-        dt = Datetime(f"{data.tarih} {data.saat}", data.utc)
+      dt = Datetime(data.tarih, data.saat, data.utc)
+
         pos = GeoPos(str(data.lat), str(data.lon))
         chart = Chart(dt, pos)
         moon = chart.get(const.MOON)
