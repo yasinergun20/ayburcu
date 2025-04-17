@@ -8,24 +8,17 @@ from flatlib import const
 app = FastAPI()
 
 class AyBurcuIstek(BaseModel):
-    tarih: str
-    saat: str
-    utc: str
-    lat: float
-    lon: float
+    tarih: str     # örn: "1995-04-15"
+    saat: str      # örn: "10:45"
+    utc: str       # örn: "+03:00"
+    lat: float     # örn: 39.92
+    lon: float     # örn: 32.85
 
 @app.post("/ayburcu")
 def hesapla(data: AyBurcuIstek):
     try:
-        # Tarihi sayısal olarak ayır
-        yil, ay, gun = [int(i) for i in data.tarih.split("-")]
-        saat, dakika = [int(i) for i in data.saat.split(":")]
-
-        # Tarihi düzgün string olarak ver
-        tarih_str = f"{yil:04d}-{ay:02d}-{gun:02d}"
-        saat_str = f"{saat:02d}:{dakika:02d}"
-
-        dt = Datetime(tarih_str, saat_str, data.utc)
+        # Doğum zamanı tek string olarak veriliyor
+        dt = Datetime(f"{data.tarih} {data.saat}", data.utc)
         pos = GeoPos(str(data.lat), str(data.lon))
         chart = Chart(dt, pos)
         moon = chart.get(const.MOON)
