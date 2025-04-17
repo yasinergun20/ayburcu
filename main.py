@@ -1,32 +1,63 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from flatlib.chart import Chart
-from flatlib.datetime import Datetime
-from flatlib.geopos import GeoPos
-from flatlib import const
+import swisseph as swe
+from datetime import datetime
 
 app = FastAPI()
+swe.set_ephe_path('.')  # Ephemeris path
+
+ZODIAC = [
+    'Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
+    'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'
+]
 
 class AyBurcuIstek(BaseModel):
-    tarih: str     # "1995-04-15"
-    saat: str      # "10:45"
-    utc: str       # "+03:00"
-    lat: float     # 39.92
-    lon: float     # 32.85
+    tarih: str
+    saat: str
+    utc: str
+    lat: float
+    lon: float
+
+def get_zodiac(degree):
+    index = int(degree / 30) % 12
+    return ZODIAC[index]
 
 @app.post("/ayburcu")
 def hesapla(data: AyBurcuIstek):
     try:
-        dt = Datetime(data.tarih, data.saat, data.utc)
-        pos = GeoPos(str(data.lat), str(data.lon))
-        chart = Chart(dt, pos)
+        dt = datetime.strptime(f"{data.tarih} {data.saat}", "%Y-%m-%d %H:%M")
 
-        moon = chart.get(const.MOON)
+        # ✅ UTC farkını saat cinsine çevir
+        utc_saat = int(data.utc.replace(":", "").replace("+", ""))
+        hour_decimal = dt.hour + dt.minute / 60.0 - utc_saat
+
+        julday = swe.julday(dt.year, dt.month, dt.day, hour_decimal)
+
+        # 🌕 Ay konumu
+        moon = swe.calc_ut(julday, swe.MOON)[0]
+        moon_lon = moon[0]
+        burc = get_zodiac(moon_lon)
+        derece = round(moon_lon % 30, 2)
+
+        # 🏠 Ev hesabı
+        cusps, _ = swe.houses(julday, data.lat, data.lon, b'P')
+        ev = 12
+        for i in range(12):
+            c1 = cusps[i]
+            c2 = cusps[(i + 1) % 12]
+            if c1 < c2:
+                if c1 <= moon_lon < c2:
+                    ev = i + 1
+                    break
+            else:
+                if moon_lon >= c1 or moon_lon < c2:
+                    ev = i + 1
+                    break
 
         return {
-            "burc": moon.sign,
-            "derece": round(moon.lon, 2),
-            "ev": moon.house
+            "burc": burc,
+            "derece": derece,
+            "ev": ev
         }
 
     except Exception as e:
