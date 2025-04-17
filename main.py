@@ -1,37 +1,53 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from flatlib.chart import Chart
-from flatlib.datetime import Datetime
-from flatlib.geopos import GeoPos
-from flatlib import const
-from flatlib.tools import houses
+import swisseph as swe
+from datetime import datetime
+import math
 
 app = FastAPI()
+swe.set_ephe_path('.')  # ephemeris dosyaları için yol
+
+ZODIAC = [
+    'Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
+    'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'
+]
 
 class AyBurcuIstek(BaseModel):
     tarih: str     # "1995-04-15"
     saat: str      # "10:45"
     utc: str       # "+03:00"
-    lat: float     # 39.92
-    lon: float     # 32.85
+    lat: float
+    lon: float
+
+def get_zodiac(degree):
+    index = int(degree / 30) % 12
+    return ZODIAC[index]
 
 @app.post("/ayburcu")
 def hesapla(data: AyBurcuIstek):
     try:
-        tarih = data.tarih.replace("-", "/")
-        dt = Datetime(tarih, data.saat, data.utc)
-        pos = GeoPos(data.lat, data.lon)
+        # Tarih ve saat formatı
+        dt = datetime.strptime(f"{data.tarih} {data.saat}", "%Y-%m-%d %H:%M")
+        julday = swe.julday(dt.year, dt.month, dt.day, dt.hour + dt.minute / 60.0)
 
-        # ❌ hsys='PLACIDUS' kullanılmıyor!
-        chart = Chart(dt, pos)
+        # Ay pozisyonu
+        moon_pos = swe.calc_ut(julday, swe.MOON)[0]
+        burc = get_zodiac(moon_pos)
+        derece = round(moon_pos % 30, 2)
 
-        moon = chart.get(const.MOON)
-        moon_house = houses.getHouse(chart, moon)
+        # Ev hesaplama
+        ascmc, cusps = swe.houses(julday, data.lat, data.lon, b'P')  # Placidus sistemi
+        for i in range(1, 13):
+            if cusps[i - 1] <= moon_pos < cusps[i % 12]:
+                ev = i
+                break
+        else:
+            ev = 12  # fallback
 
         return {
-            "burc": moon.sign,
-            "derece": round(moon.lon, 2),
-            "ev": moon_house
+            "burc": burc,
+            "derece": derece,
+            "ev": ev
         }
 
     except Exception as e:
