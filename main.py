@@ -8,11 +8,12 @@ from flatlib import const
 app = FastAPI()
 
 class AyBurcuIstek(BaseModel):
-    tarih: str   # Örn: '1995-04-15'
-    saat: str    # Örn: '10:45'
-    utc: str     # Örn: '+03:00'
-    lat: float   # Enlem
-    lon: float   # Boylam
+    tarih: str  # '1995-04-15'
+    saat: str   # '10:45'
+    utc: str    # '+03:00'
+    lat: float
+    lon: float
+
 
 @app.post("/ayburcu")
 def hesapla(data: AyBurcuIstek):
