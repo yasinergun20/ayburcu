@@ -4,6 +4,7 @@ from flatlib.chart import Chart
 from flatlib.datetime import Datetime
 from flatlib.geopos import GeoPos
 from flatlib import const
+from flatlib.tools import houses
 
 app = FastAPI()
 
@@ -17,22 +18,24 @@ class AyBurcuIstek(BaseModel):
 @app.post("/ayburcu")
 def hesapla(data: AyBurcuIstek):
     try:
-        # Flatlib 'yyyy/mm/dd' istiyor
+        # Tarihi düzelt
         tarih = data.tarih.replace("-", "/")
-
-        # Doğum zamanı ve konum
         dt = Datetime(tarih, data.saat, data.utc)
         pos = GeoPos(data.lat, data.lon)
 
-        # Chart oluşturulurken "houses=True" eklendi
+        # Chart oluştur
         chart = Chart(dt, pos, hsys='PLACIDUS')
 
+        # Ay bilgisi
         moon = chart.get(const.MOON)
+
+        # Ay'ın evi (manuel hesaplama)
+        moon_house = houses.getHouse(chart, moon)
 
         return {
             "burc": moon.sign,
             "derece": round(moon.lon, 2),
-            "ev": moon.house
+            "ev": moon_house
         }
 
     except Exception as e:
