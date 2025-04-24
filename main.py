@@ -4,13 +4,10 @@ from flatlib.chart import Chart
 from flatlib.datetime import Datetime
 from flatlib.geopos import GeoPos
 from flatlib.const import MOON
-from typing import Optional
-from pydantic import BaseModel
-import uvicorn
 
 app = FastAPI()
 
-# CORS ayarı (gerekirse Flutter için)
+# CORS ayarı (Flutter için açık)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -38,7 +35,7 @@ def float_to_dms(value):
     saniye = int((dakika_float - dakika) * 60)
     return f"{derece}:{dakika}:{saniye}"
 
-# API route
+# Ay Burcu Hesaplama Endpoint'i
 @app.get("/ayburcu")
 def ay_burcu_hesapla(
     yil: int,
@@ -52,7 +49,7 @@ def ay_burcu_hesapla(
     try:
         dt = Datetime(f'{yil}/{ay:02d}/{gun:02d}', f'{saat:02d}:{dakika:02d}', '+00:00')
         pos = GeoPos(float_to_dms(enlem), float_to_dms(boylam))
-        chart = Chart(dt, pos)  # Evsiz!
+        chart = Chart(dt, pos)
         moon = chart.get(MOON)
         burc, derece = ecliptic_degree_to_zodiac(moon.lon)
 
@@ -62,7 +59,3 @@ def ay_burcu_hesapla(
         }
     except Exception as e:
         return {"error": str(e)}
-
-# Eğer lokal çalıştıracaksan
-if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=10000)
