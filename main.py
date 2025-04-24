@@ -1,9 +1,25 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from flatlib.chart import Chart
 from flatlib.datetime import Datetime
 from flatlib.geopos import GeoPos
 from flatlib.const import MOON
+from typing import Optional
+from pydantic import BaseModel
+import uvicorn
 
-# Dereceyi burç ve dereceye çeviren fonksiyon
+app = FastAPI()
+
+# CORS ayarı (gerekirse Flutter için)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Dereceyi burç + dereceye çevir
 def ecliptic_degree_to_zodiac(degree):
     index = int(degree // 30)
     zodiac_signs = [
@@ -14,7 +30,7 @@ def ecliptic_degree_to_zodiac(degree):
     derece = round(degree % 30, 2)
     return burc, derece
 
-# Float enlem/boylamı DMS (derece:dakika:saniye) formatına çevir
+# Float enlem/boylamı DMS formatına çevir
 def float_to_dms(value):
     derece = int(value)
     dakika_float = abs(value - derece) * 60
@@ -22,21 +38,31 @@ def float_to_dms(value):
     saniye = int((dakika_float - dakika) * 60)
     return f"{derece}:{dakika}:{saniye}"
 
-# Ay burcu, derecesi ve ev bilgisi döner
-def get_ay_burcu_derece_ev(yil, ay, gun, saat, dakika, enlem, boylam):
-    dt = Datetime(f'{yil}/{ay:02d}/{gun:02d}', f'{saat:02d}:{dakika:02d}', '+00:00')
-    enlem_dms = float_to_dms(enlem)
-    boylam_dms = float_to_dms(boylam)
-    pos = GeoPos(enlem_dms, boylam_dms)
-    chart = Chart(dt, pos, hsys='PLACIDUS')
+# API route
+@app.get("/ayburcu")
+def ay_burcu_hesapla(
+    yil: int,
+    ay: int,
+    gun: int,
+    saat: int,
+    dakika: int,
+    enlem: float,
+    boylam: float
+):
+    try:
+        dt = Datetime(f'{yil}/{ay:02d}/{gun:02d}', f'{saat:02d}:{dakika:02d}', '+00:00')
+        pos = GeoPos(float_to_dms(enlem), float_to_dms(boylam))
+        chart = Chart(dt, pos)  # Evsiz!
+        moon = chart.get(MOON)
+        burc, derece = ecliptic_degree_to_zodiac(moon.lon)
 
-    moon = chart.get(MOON)
-    burc, derece = ecliptic_degree_to_zodiac(moon.lon)
-    ev = moon.house
-    return burc, derece, ev
+        return {
+            "burc": burc,
+            "derece": derece
+        }
+    except Exception as e:
+        return {"error": str(e)}
 
-# ÖRNEK: 15 Ocak 2025, saat 12:00 UTC, Ankara koordinatları
-burc, derece, ev = get_ay_burcu_derece_ev(2025, 1, 15, 12, 0, 39.9208, 32.8541)
-print(f"Ay Burcu: {burc}")
-print(f"Ay Derecesi: {derece}°")
-print(f"Ay Evi: {ev}")
+# Eğer lokal çalıştıracaksan
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="0.0.0.0", port=10000)
