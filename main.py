@@ -1,30 +1,42 @@
-from fastapi import FastAPI, Query
-from flatlib.geopos import GeoPos
-from flatlib.datetime import Datetime
 from flatlib.chart import Chart
+from flatlib.datetime import Datetime
+from flatlib.geopos import GeoPos
 from flatlib.const import MOON
 
-app = FastAPI()
+# Dereceyi burç ve dereceye çeviren fonksiyon
+def ecliptic_degree_to_zodiac(degree):
+    index = int(degree // 30)
+    zodiac_signs = [
+        'Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
+        'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'
+    ]
+    burc = zodiac_signs[index % 12]
+    derece = round(degree % 30, 2)
+    return burc, derece
 
-def hesapla_ay_burcu(yil, ay, gun, saat, dakika, enlem, boylam):
-    pos = GeoPos(str(enlem), str(boylam))
-    date = Datetime(f"{yil}-{ay:02d}-{gun:02d}", f"{saat:02d}:{dakika:02d}", '+03:00')  # Türkiye sabit saat dilimi
-    chart = Chart(date, pos, hsys='PLACIDUS')
+# Float enlem/boylamı DMS (derece:dakika:saniye) formatına çevir
+def float_to_dms(value):
+    derece = int(value)
+    dakika_float = abs(value - derece) * 60
+    dakika = int(dakika_float)
+    saniye = int((dakika_float - dakika) * 60)
+    return f"{derece}:{dakika}:{saniye}"
+
+# Ay burcu, derecesi ve ev bilgisi döner
+def get_ay_burcu_derece_ev(yil, ay, gun, saat, dakika, enlem, boylam):
+    dt = Datetime(f'{yil}/{ay:02d}/{gun:02d}', f'{saat:02d}:{dakika:02d}', '+00:00')
+    enlem_dms = float_to_dms(enlem)
+    boylam_dms = float_to_dms(boylam)
+    pos = GeoPos(enlem_dms, boylam_dms)
+    chart = Chart(dt, pos, hsys='PLACIDUS')
+
     moon = chart.get(MOON)
-    return {
-        "burc": moon.sign,
-        "derece": round(moon.lon % 30, 2),
-        "ev": moon.house
-    }
+    burc, derece = ecliptic_degree_to_zodiac(moon.lon)
+    ev = moon.house
+    return burc, derece, ev
 
-@app.get("/ayburcu")
-def ay_burcu_api(
-    yil: int = Query(...),
-    ay: int = Query(...),
-    gun: int = Query(...),
-    saat: int = Query(...),
-    dakika: int = Query(...),
-    enlem: float = Query(...),
-    boylam: float = Query(...)
-):
-    return hesapla_ay_burcu(yil, ay, gun, saat, dakika, enlem, boylam)
+# ÖRNEK: 15 Ocak 2025, saat 12:00 UTC, Ankara koordinatları
+burc, derece, ev = get_ay_burcu_derece_ev(2025, 1, 15, 12, 0, 39.9208, 32.8541)
+print(f"Ay Burcu: {burc}")
+print(f"Ay Derecesi: {derece}°")
+print(f"Ay Evi: {ev}")
