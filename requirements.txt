@@ -1,4 +1,3 @@
 fastapi
 uvicorn
-swisseph
-pydantic
+flatlib
